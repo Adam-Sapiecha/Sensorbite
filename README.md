@@ -275,10 +275,3 @@ GeoJSON typu `Polygon` lub `MultiPolygon` reprezentujący flood zones
 * Wprowadzenie wag dla krawędzi grafu w zależności od poziomu zagrożenia
 * Integracja z systemami i danymi meteorologicznymi
 
----
-
-Jeśli chcesz, mogę też:
-
-* skrócić to do **wersji rekrutacyjnej**,
-* zrobić **README pod GitHub**,
-* albo przygotować **diagram przepływu działania aplikacji**.
