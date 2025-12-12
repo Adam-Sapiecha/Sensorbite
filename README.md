@@ -1,262 +1,288 @@
-<<<<<<< HEAD
+Pewnie — **nie zmieniam treści**, tylko **porządkuję strukturę, nagłówki i listy**, żeby było czytelne i logiczne (idealne np. na README).
+
+---
+
 # Sensorbite
-=======
-Opis
 
-Projekt prezentuje aplikacje do wyznaczania tras ewakuacji z uwzglednieniem zagrozen powodziowych. System laczy dane drogowe z OpenStreetMap z danymi satelitarnymi Sentinel Hub i wyznacza trase omijajaca zalane odcinki drog.
+## Opis
 
-Aplikacja sklada sie z backendu w Python (FastAPI), ktory przetwarza dane przestrzenne i oblicza trase, oraz prostego interfejsu webowego umozliwiajacego wizualizacje mapy, flood zones i trasy ewakuacji. Calosc mozna uruchomic lokalnie jedna komenda przy uzyciu Dockera.
+Projekt prezentuje aplikację do wyznaczania tras ewakuacji z uwzględnieniem zagrożeń powodziowych.
+System łączy dane drogowe z **OpenStreetMap** z danymi satelitarnymi **Sentinel Hub** i wyznacza trasę omijającą zalane odcinki dróg.
 
+Aplikacja składa się z:
 
-Proces uruchomienia i korzystania z aplikacji
+* backendu w **Python (FastAPI)**, który przetwarza dane przestrzenne i oblicza trasę,
+* prostego interfejsu webowego umożliwiającego wizualizację mapy, flood zones i trasy ewakuacji.
 
-1. Uruchomienie aplikacji
+Całość można uruchomić lokalnie jedną komendą przy użyciu **Dockera**.
 
-Aplikacja uruchamiana jest przy użyciu Docker Compose.
+---
+
+## Proces uruchomienia i korzystania z aplikacji
+
+### 1. Uruchomienie aplikacji
+
+Aplikacja uruchamiana jest przy użyciu **Docker Compose**.
 
 W katalogu głównym projektu należy wykonać polecenie:
 
+```bash
 docker compose up --build
+```
 
-Front odpali się na http://localhost:8080/
+Frontend będzie dostępny pod adresem:
+**[http://localhost:8080/](http://localhost:8080/)**
 
-2. Pobranie danych drogowych 
+---
+
+### 2. Pobranie danych drogowych
 
 Po wejściu na frontend użytkownik pracuje na mapie OpenStreetMap.
 
-Pierwszym krokiem jest pobranie dróg dla aktualnego widoku mapy z możliwie ograniczonego obszaru:
+Proces pobierania dróg:
 
-użytkownik ustawia obszar na mapie,
-
-kliknięcie przycisku "Pobierz drogi dla widoku" wysyła do backendu aktualny bounding box,
-
-backend pobiera dane drogowe
-
-dane są konwertowane do formatu GeoJSON,
-
-na ich podstawie budowany jest graf dróg w pamięci aplikacji.
+* użytkownik ustawia obszar na mapie,
+* kliknięcie przycisku **„Pobierz drogi dla widoku”** wysyła do backendu aktualny bounding box,
+* backend pobiera dane drogowe,
+* dane są konwertowane do formatu **GeoJSON**,
+* na ich podstawie budowany jest graf dróg w pamięci aplikacji.
 
 Po tym kroku graf dróg jest gotowy do dalszych obliczeń.
 
-3. Nałożenie flood zones
+---
+
+### 3. Nałożenie flood zones
 
 Aplikacja obsługuje dwa sposoby pozyskania stref zalania.
 
-Tryb Sentinel Hub:
+#### Tryb Sentinel Hub
 
-kliknięcie przycisku "Pobierz strefy zalania dla widoku" powoduje pobranie obrazu satelitarnego przez Sentinel Hub OGC WMS,
+* kliknięcie przycisku **„Pobierz strefy zalania dla widoku”** powoduje pobranie obrazu satelitarnego przez Sentinel Hub OGC WMS,
+* obraz jest analizowany piksel po pikselu,
+* wykrywane są obszary zalania,
+* maska zalania jest konwertowana do poligonów,
+* poligony zapisywane są jako aktualne flood zones.
 
-obraz jest analizowany piksel po pikselu,
+#### Tryb testowy
 
-wykrywane są obszary zalania,
+* użytkownik może uruchomić tryb testowy flood zones,
+* generowany jest sztuczny prostokątny obszar zalania,
+* tryb ten pozwala testować algorytm bez dostępu do Sentinel Hub.
 
-maska zalania jest konwertowana do poligonów,
+---
 
-poligony zapisywane są jako aktualne flood zones.
-
-Tryb testowy:
-
-użytkownik może uruchomić tryb testowy flood zones,
-
-generowany jest sztuczny prostokątny obszar zalania,
-
-tryb ten pozwala testować algorytm bez dostępu do Sentinel Hub.
-
-4. Blokowanie zalanych odcinków dróg
+### 4. Blokowanie zalanych odcinków dróg
 
 Przed wyznaczeniem trasy backend:
 
-wczytuje aktualne flood zones,
+* wczytuje aktualne flood zones,
+* sprawdza przecinanie się każdej krawędzi grafu dróg z poligonami zalania,
+* oznacza przecinające się odcinki jako zablokowane.
 
-sprawdza przecinanie sie kazdej krawedzi grafu drog z poligonami zalania,
+Zablokowane odcinki nie są brane pod uwagę przy wyznaczaniu trasy.
 
-oznacza przecinajace sie odcinki jako zablokowane.
+---
 
-Zablokowane odcinki nie sa brane pod uwage przy wyznaczaniu trasy.
+### 5. Wybór punktów START i META
 
-5. Wybor punktow START i META
+Użytkownik:
 
-Uzytkownik:
+* kliknięciem na mapie ustawia punkt **START**,
+* kliknięciem na mapie ustawia punkt **META**.
 
-kliknieciem na mapie ustawia punkt START,
+Punkty te są automatycznie dopasowywane do najbliższych węzłów grafu drogowego.
 
-kliknieciem na mapie ustawia punkt META.
+---
 
-Punkty te sa automatycznie dopasowywane do najblizszych wezlow grafu drogowego.
+### 6. Wyznaczenie trasy ewakuacji
 
-6. Wyznaczenie trasy ewakuacji
+Po kliknięciu przycisku **„Wyznacz trasę”**:
 
-Po kliknieciu przycisku "Wyznacz trase":
+* frontend wysyła zapytanie do endpointu:
 
-frontend wysyla zapytanie do endpointu:
+```
 GET /api/evac/route?start=lat,lon&end=lat,lon
+```
 
-backend buduje podgraf zawierajacy tylko niezablokowane odcinki,
+* backend buduje podgraf zawierający tylko niezablokowane odcinki,
+* uruchamiany jest algorytm najkrótszej ścieżki,
+* wyznaczana jest trasa omijająca zalane fragmenty,
+* wynik zwracany jest w formacie **GeoJSON** wraz z metadanymi.
 
-uruchamiany jest algorytm najkrotszej sciezki,
+---
 
-wyznaczana jest trasa omijajaca zalane fragmenty,
-
-wynik zwracany jest w formacie GeoJSON wraz z metadanymi.
-
-7. Wizualizacja wyniku
+### 7. Wizualizacja wyniku
 
 Frontend:
 
-rysuje trase ewakuacji na mapie,
+* rysuje trasę ewakuacji na mapie,
+* wyświetla ją na tle dróg i stref zalania,
+* pozwala łatwo porównać trasę z i bez zagrożeń.
 
-wyswietla ja na tle drog i stref zalania,
+---
 
-pozwala latwo porownac trase z i bez zagrozen.
+## Podsumowanie procesu
 
-Podsumowanie procesu
+Pełny proces działania aplikacji:
 
-Pelny proces dzialania aplikacji:
+1. Uruchomienie aplikacji
+2. Pobranie dróg z OpenStreetMap
+3. Pobranie lub wygenerowanie flood zones
+4. Zablokowanie zalanych odcinków
+5. Ustawienie punktów START i META
+6. Wyznaczenie trasy ewakuacji
+7. Wizualizacja trasy na mapie
 
-Uruchomienie aplikacji
+---
 
-Pobranie drog z OpenStreetMap
+## Pliki
 
-Pobranie lub wygenerowanie flood zones
+### Frontend
 
-Zablokowanie zalanych odcinkow
+**frontend/index.html**
+Interfejs użytkownika oparty o HTML i JavaScript (Leaflet).
+Odpowiada za wyświetlanie mapy, interakcje użytkownika oraz komunikację z backendem.
 
-Ustawienie punktow START i META
+### Backend
 
-Wyznaczenie trasy ewakuacji
+**main.py**
+Punkt startowy aplikacji backendowej. Tworzy instancję FastAPI, konfiguruje middleware oraz rejestruje endpointy API.
 
-Wizualizacja trasy na mapie
+**routes.py**
+Definicja endpointów HTTP udostępnianych przez backend, w tym wyznaczania trasy oraz operacji administracyjnych.
 
+**evac_service.py**
+Główna warstwa logiki aplikacji. Łączy pobieranie dróg, przetwarzanie flood zones oraz wyznaczanie trasy ewakuacji.
 
+**osm_downloader.py**
+Pobiera dane drogowe z OpenStreetMap przy użyciu Overpass API na podstawie bounding boxa.
 
-
-
-PLIKI
-
-frontend/index.html
-Interfejs uzytkownika oparty o HTML i JavaScript (Leaflet). Odpowiada za wyswietlanie mapy, interakcje uzytkownika oraz komunikacje z backendem.
-
-Backend:
-
-main.py
-Punkt startowy aplikacji backendowej. Tworzy instancje FastAPI, konfiguruje middleware oraz rejestruje endpointy API.
-
-routes.py
-Definicja endpointow HTTP udostepnianych przez backend, w tym wyznaczania trasy oraz operacji administracyjnych.
-
-evac_service.py
-Glowna warstwa logiki aplikacji. Laczy pobieranie drog, przetwarzanie flood zones oraz wyznaczanie trasy ewakuacji.
-
-osm_downloader.py
-Pobiera dane drogowe z OpenStreetMap przy uzyciu Overpass API na podstawie bounding boxa.
-
-osm_to_geojson.py
+**osm_to_geojson.py**
 Konwertuje dane OSM w formacie XML do formatu GeoJSON.
 
-graph_builder.py
-Buduje graf drog (NetworkX) na podstawie danych GeoJSON.
+**graph_builder.py**
+Buduje graf dróg (NetworkX) na podstawie danych GeoJSON.
 
-sentinel_flood_ogc_client.py
-Pobiera obrazy satelitarne z Sentinel Hub (OGC WMS) i przetwarza je na maske oraz poligony zalania.
+**sentinel_flood_ogc_client.py**
+Pobiera obrazy satelitarne z Sentinel Hub (OGC WMS) i przetwarza je na maskę oraz poligony zalania.
 
-flood_loader.py
+**flood_loader.py**
 Wczytuje flood zones zapisane w plikach GeoJSON do dalszego przetwarzania.
 
-flood_intersector.py
-Sprawdza przeciecia miedzy flood zones a odcinkami drog i oznacza zalane krawedzie jako zablokowane.
+**flood_intersector.py**
+Sprawdza przecięcia między flood zones a odcinkami dróg i oznacza zalane krawędzie jako zablokowane.
 
-router.py
-Odpowiada za wyznaczanie najkrotszej trasy ewakuacji z pominieciem zablokowanych odcinkow.
+**router.py**
+Odpowiada za wyznaczanie najkrótszej trasy ewakuacji z pominięciem zablokowanych odcinków.
 
-utils.py
-Zawiera funkcje pomocnicze wykorzystywane w roznych modulach, miedzy innymi obliczanie odleglosci.
+**utils.py**
+Zawiera funkcje pomocnicze wykorzystywane w różnych modułach, m.in. obliczanie odległości.
 
+---
 
+## Endpointy
 
-ENDPOINTY
+### Wyznaczanie trasy ewakuacji
 
-Wyznaczanie trasy ewakuacji
-
+```
 GET /api/evac/route?start=lat,lon&end=lat,lon
+```
 
-Opis:
-Wyznacza trase ewakuacji pomiedzy punktami START i META, z pominieciem zalanych odcinkow drog.
+**Opis:**
+Wyznacza trasę ewakuacji pomiędzy punktami START i META z pominięciem zalanych odcinków dróg.
 
-Parametry:
+**Parametry:**
 
-start: wspolrzedne punktu startowego (latitude, longitude)
+* `start` – współrzędne punktu startowego (latitude, longitude)
+* `end` – współrzędne punktu docelowego (latitude, longitude)
 
-end: wspolrzedne punktu docelowego (latitude, longitude)
+**Zwraca:**
 
-Zwraca:
+* GeoJSON typu `LineString` reprezentujący trasę ewakuacji
+* metadane trasy (długość, liczba segmentów, liczba zablokowanych odcinków)
 
-GeoJSON typu LineString reprezentujacy trase ewakuacji
+---
 
-metadane trasy (dlugosc, liczba segmentow, liczba zablokowanych odcinkow)
+### Operacje administracyjne (backend)
 
-Operacje administracyjne (backend)
+#### Aktualizacja dróg
 
+```
 POST /api/admin/update-roads
+```
 
-Opis:
-Pobiera dane drogowe z OpenStreetMap dla aktualnego obszaru mapy i przebudowuje graf drog.
+**Opis:**
+Pobiera dane drogowe z OpenStreetMap dla aktualnego obszaru mapy i przebudowuje graf dróg.
 
-Wejscie:
+**Wejście:**
+Bounding box `(south, west, north, east)` w ciele zapytania
 
-bounding box (south, west, north, east) w ciele zapytania
+**Zwraca:**
+Komunikat statusowy potwierdzający pobranie i przetworzenie dróg
 
-Zwraca:
+---
 
-komunikat statusowy potwierdzajacy pobranie i przetworzenie drog
+#### Aktualizacja flood zones
 
+```
 POST /api/admin/update-flood
+```
 
-Opis:
+**Opis:**
 Pobiera i przetwarza strefy zalania z Sentinel Hub dla aktualnego obszaru mapy.
 
-Wejscie:
+**Wejście:**
+Bounding box `(south, west, north, east)` w ciele zapytania
 
-bounding box (south, west, north, east) w ciele zapytania
+**Zwraca:**
+Komunikat statusowy potwierdzający aktualizację flood zones
 
-Zwraca:
+---
 
-komunikat statusowy potwierdzajacy aktualizacje flood zones
+#### Testowe flood zones
 
+```
 POST /api/admin/set-test-flood-rect
+```
 
-Opis:
-Generuje testowy, sztuczny obszar zalania w postaci prostokata. Endpoint przeznaczony do testow i debugowania.
+**Opis:**
+Generuje testowy, sztuczny obszar zalania w postaci prostokąta.
+Endpoint przeznaczony do testów i debugowania.
 
-Wejscie:
+**Wejście:**
+Bounding box `(south, west, north, east)` w ciele zapytania
 
-bounding box (south, west, north, east) w ciele zapytania
+**Zwraca:**
+Komunikat statusowy potwierdzający utworzenie testowych flood zones
 
-Zwraca:
+---
 
-komunikat statusowy potwierdzajacy utworzenie testowych flood zones
+### Endpointy diagnostyczne
 
-Endpointy diagnostyczne
-
+```
 GET /api/debug/flood-geojson
+```
 
-Opis:
-Zwraca aktualnie zaladowane strefy zalania w postaci GeoJSON.
+**Opis:**
+Zwraca aktualnie załadowane strefy zalania w postaci GeoJSON.
 
-Zwraca:
+**Zwraca:**
+GeoJSON typu `Polygon` lub `MultiPolygon` reprezentujący flood zones
 
-GeoJSON typu Polygon lub MultiPolygon reprezentujacy flood zones
+---
 
+## Pomysły na rozwój
 
+* Uwzględnienie danych czasowych (time series) z Sentinel Hub w celu śledzenia rozwoju zalania w czasie
+* Dynamiczna aktualizacja flood zones w trakcie działania aplikacji
+* Rozszerzenie algorytmu routingu o dodatkowe kryteria (typ drogi, prędkość ruchu, przepustowość)
+* Wprowadzenie wag dla krawędzi grafu w zależności od poziomu zagrożenia
+* Integracja z systemami i danymi meteorologicznymi
 
-Pomysly na rozwoj
+---
 
-Uwzglednienie danych czasowych (time series) z Sentinel Hub w celu sledzenia rozwoju zalania w czasie.
+Jeśli chcesz, mogę też:
 
-Dynamiczna aktualizacja flood zones w trakcie dzialania aplikacji.
-
-Rozszerzenie algorytmu routingu o dodatkowe kryteria, takie jak typ drogi, predkosc ruchu lub przepustowosc.
-
-Wprowadzenie wag dla krawedzi grafu w zaleznosci od poziomu zagrozenia.
-
-Integracja z systemami i danymi meteorologicznymi.
->>>>>>> 433f28f (Działająca wersja)
+* skrócić to do **wersji rekrutacyjnej**,
+* zrobić **README pod GitHub**,
+* albo przygotować **diagram przepływu działania aplikacji**.
