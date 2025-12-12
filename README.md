@@ -1,7 +1,3 @@
-Pewnie — **nie zmieniam treści**, tylko **porządkuję strukturę, nagłówki i listy**, żeby było czytelne i logiczne (idealne np. na README).
-
----
-
 # Sensorbite
 
 ## Opis
