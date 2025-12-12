@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <title>Sensorbite – demo trasy ewakuacji</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f3f4f6;
+    }
+
+    .page {
+      height: 100%;
+      display: flex;
+      flex-direction: row;
+    }
+
+    .sidebar {
+      width: 320px;
+      max-width: 100%;
+      background: #ffffff;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+      padding: 16px 18px;
+      box-sizing: border-box;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .sidebar h1 {
+      font-size: 18px;
+      margin: 0 0 4px;
+    }
+
+    .sidebar p {
+      margin: 0;
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .section {
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      padding: 12px 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #4b5563;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 7px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      background: #2563eb;
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.1s ease;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+      white-space: nowrap;
+    }
+
+    button.secondary {
+      background: #e5e7eb;
+      color: #111827;
+      box-shadow: none;
+    }
+
+    button:active {
+      transform: translateY(1px);
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+    }
+
+    button.mode-active {
+      background: #1d4ed8;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.45);
+    }
+
+    .inputs-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      font-size: 11px;
+      color: #6b7280;
+      gap: 2px;
+    }
+
+    input[type="text"] {
+      border-radius: 999px;
+      border: 1px solid #d1d5db;
+      padding: 5px 9px;
+      font-size: 12px;
+      outline: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.4);
+    }
+
+    .info {
+      font-size: 12px;
+      color: #4b5563;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: #f9fafb;
+      border: 1px dashed #e5e7eb;
+    }
+
+    .info strong {
+      font-weight: 600;
+    }
+
+    .status {
+      font-size: 12px;
+      color: #374151;
+      min-height: 1.2em;
+    }
+
+    .status.error {
+      color: #b91c1c;
+    }
+
+    .status.success {
+      color: #15803d;
+    }
+
+    .metrics {
+      font-size: 12px;
+      color: #374151;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .map-wrapper {
+      flex: 1;
+      position: relative;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    @media (max-width: 800px) {
+      .page {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        box-shadow: none;
+        border-bottom: 1px solid #e5e7eb;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <aside class="sidebar">
+      <div>
+        <h1>Demo trasy ewakuacji</h1>
+        <p>Wybierz obszar, pobierz drogi i strefy zalania, a następnie wyznacz trasę ewakuacji.</p>
+      </div>
+
+      <section class="section">
+        <div class="section-title">1. Obszar dróg (BBox)</div>
+        <div class="info">
+          Ustaw widok mapy na interesujący Cię obszar, a następnie pobierz drogi
+          z <strong>Overpass API</strong> dla tego widoku.
+        </div>
+        <div class="btn-row">
+          <button id="btn-update-roads">Pobierz drogi dla widoku</button>
+          <button id="btn-zoom-falenty" class="secondary">Falenty</button>
+        </div>
+        <div class="status" id="roads-status"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">1.2. Strefy zalania (Sentinel Hub)</div>
+        <div class="info">
+          Pobierz strefy zalania z Sentinel Hub dla aktualnego widoku mapy.
+          Po pobraniu zobaczysz je jako czerwone poligony.
+        <div class="btn-row">
+         <button id="btn-update-flood">Pobierz strefy zalania dla widoku</button>
+         <button id="btn-test-flood-rect" class="secondary">
+    Testowy prostokąt flood
+  </button>
+</div>
+
+        <div class="status" id="flood-status"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">2. Trasa ewakuacji</div>
+        <div class="btn-row">
+          <button id="btn-mode-start" class="secondary">Ustaw START na mapie</button>
+          <button id="btn-mode-end" class="secondary">Ustaw METĘ na mapie</button>
+          <button id="btn-clear" class="secondary">Wyczyść</button>
+        </div>
+
+        <div class="inputs-row">
+          <label>
+            START – szer. (lat)
+            <input type="text" id="start-lat" placeholder="np. 52.2297" />
+          </label>
+          <label>
+            START – dł. (lon)
+            <input type="text" id="start-lon" placeholder="np. 21.0122" />
+          </label>
+          <label>
+            META – szer. (lat)
+            <input type="text" id="end-lat" placeholder="np. 52.23" />
+          </label>
+          <label>
+            META – dł. (lon)
+            <input type="text" id="end-lon" placeholder="np. 21.01" />
+          </label>
+        </div>
+
+        <div class="btn-row">
+          <button id="btn-route">Wyznacz trasę</button>
+          <button id="btn-show-blocked" class="secondary">Pokaż zablokowane odcinki</button>
+        </div>
+
+        <div class="status" id="route-status"></div>
+        <div class="metrics" id="route-metrics"></div>
+      </section>
+    </aside>
+
+    <main class="map-wrapper">
+      <div id="map"></div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    const API_BASE = "http://localhost:8000/api";
+
+    const map = L.map("map", { preferCanvas: true }).setView([52.2297, 21.0122], 13);
+
+    L.tileLayer(
+      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      }
+    ).addTo(map);
+
+    let startMarker = null;
+    let endMarker = null;
+    let routeLayer = null;
+    let floodLayer = null;
+    let blockedLayer = null;
+    let selectMode = null;
+
+    const btnModeStart = document.getElementById("btn-mode-start");
+    const btnModeEnd = document.getElementById("btn-mode-end");
+    const btnClear = document.getElementById("btn-clear");
+    const btnUpdateRoads = document.getElementById("btn-update-roads");
+    const btnUpdateFlood = document.getElementById("btn-update-flood");
+    const btnTestFloodRect = document.getElementById("btn-test-flood-rect");
+
+    const btnZoomfalenty = document.getElementById("btn-zoom-falenty");
+    const btnRoute = document.getElementById("btn-route");
+    const btnShowBlocked = document.getElementById("btn-show-blocked");
+
+    const startLatInput = document.getElementById("start-lat");
+    const startLonInput = document.getElementById("start-lon");
+    const endLatInput = document.getElementById("end-lat");
+    const endLonInput = document.getElementById("end-lon");
+
+    const roadsStatusEl = document.getElementById("roads-status");
+    const floodStatusEl = document.getElementById("flood-status");
+    const routeStatusEl = document.getElementById("route-status");
+    const routeMetricsEl = document.getElementById("route-metrics");
+
+    function setRoadsStatus(msg, type = "") {
+      roadsStatusEl.textContent = msg || "";
+      roadsStatusEl.className = "status" + (type ? " " + type : "");
+    }
+
+    function setFloodStatus(msg, type = "") {
+      floodStatusEl.textContent = msg || "";
+      floodStatusEl.className = "status" + (type ? " " + type : "");
+    }
+
+    function setRouteStatus(msg, type = "") {
+      routeStatusEl.textContent = msg || "";
+      routeStatusEl.className = "status" + (type ? " " + type : "");
+    }
+
+    function setRouteMetrics(data) {
+      if (!data) {
+        routeMetricsEl.innerHTML = "";
+        return;
+      }
+      const lengthKm = (data.length_m / 1000).toFixed(2);
+      const segments = data.segments;
+      const blocked = data.blocked_edges_count;
+
+      routeMetricsEl.innerHTML = `
+        <div><strong>Długość trasy:</strong> ${lengthKm} km</div>
+        <div><strong>Liczba segmentów:</strong> ${segments}</div>
+        <div><strong>Zablokowanych krawędzi w grafie:</strong> ${blocked}</div>
+      `;
+    }
+
+    function clearModeButtons() {
+      btnModeStart.classList.remove("mode-active");
+      btnModeEnd.classList.remove("mode-active");
+    }
+
+    btnModeStart.addEventListener("click", () => {
+      if (selectMode === "start") {
+        selectMode = null;
+        clearModeButtons();
+      } else {
+        selectMode = "start";
+        clearModeButtons();
+        btnModeStart.classList.add("mode-active");
+      }
+    });
+
+    btnModeEnd.addEventListener("click", () => {
+      if (selectMode === "end") {
+        selectMode = null;
+        clearModeButtons();
+      } else {
+        selectMode = "end";
+        clearModeButtons();
+        btnModeEnd.classList.add("mode-active");
+      }
+    });
+
+    map.on("click", (e) => {
+      if (!selectMode) return;
+
+      const { lat, lng } = e.latlng;
+
+      if (selectMode === "start") {
+        if (startMarker) {
+          startMarker.setLatLng(e.latlng);
+        } else {
+          startMarker = L.marker(e.latlng, { draggable: false })
+            .addTo(map)
+            .bindPopup("START");
+        }
+        startLatInput.value = lat.toFixed(6);
+        startLonInput.value = lng.toFixed(6);
+      } else if (selectMode === "end") {
+        if (endMarker) {
+          endMarker.setLatLng(e.latlng);
+        } else {
+          endMarker = L.marker(e.latlng, { draggable: false })
+            .addTo(map)
+            .bindPopup("META");
+        }
+        endLatInput.value = lat.toFixed(6);
+        endLonInput.value = lng.toFixed(6);
+      }
+    });
+
+    btnClear.addEventListener("click", () => {
+      if (startMarker) {
+        map.removeLayer(startMarker);
+        startMarker = null;
+      }
+      if (endMarker) {
+        map.removeLayer(endMarker);
+        endMarker = null;
+      }
+      if (routeLayer) {
+        map.removeLayer(routeLayer);
+        routeLayer = null;
+      }
+      if (floodLayer) {
+        map.removeLayer(floodLayer);
+        floodLayer = null;
+      }
+      if (blockedLayer) {
+        map.removeLayer(blockedLayer);
+        blockedLayer = null;
+      }
+
+      startLatInput.value = "";
+      startLonInput.value = "";
+      endLatInput.value = "";
+      endLonInput.value = "";
+
+      setRouteStatus("");
+      setRouteMetrics(null);
+      selectMode = null;
+      clearModeButtons();
+    });
+
+    btnZoomfalenty.addEventListener("click", () => {
+      map.setView([52.137841, 20.924783], 16);
+    });
+
+    btnUpdateRoads.addEventListener("click", async () => {
+      const bounds = map.getBounds();
+      const bbox = {
+        south: bounds.getSouth(),
+        west: bounds.getWest(),
+        north: bounds.getNorth(),
+        east: bounds.getEast()
+      };
+
+      setRoadsStatus("Pobieram drogi z Overpass API…");
+
+      try {
+        const resp = await fetch(`${API_BASE}/admin/update-roads`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bbox)
+        });
+
+        if (!resp.ok) {
+          const text = await resp.text();
+          throw new Error(`Błąd ${resp.status}: ${text}`);
+        }
+
+        const data = await resp.json();
+        setRoadsStatus(
+          `Załadowano ${data.roads} dróg dla bbox (S=${bbox.south.toFixed(4)}, W=${bbox.west.toFixed(4)}, N=${bbox.north.toFixed(4)}, E=${bbox.east.toFixed(4)})`,
+          "success"
+        );
+      } catch (err) {
+        console.error(err);
+        setRoadsStatus("Nie udało się pobrać dróg: " + err.message, "error");
+      }
+    });
+
+    async function loadFloodLayer() {
+      try {
+        const resp = await fetch(`${API_BASE}/debug/flood-geojson`);
+        if (!resp.ok) {
+          console.warn("Brak flood.geojson albo błąd API");
+          return;
+        }
+
+        const geojson = await resp.json();
+
+        if (floodLayer) {
+          map.removeLayer(floodLayer);
+        }
+
+        floodLayer = L.geoJSON(geojson, {
+          style: {
+            color: "#ef4444",
+            weight: 1,
+            fillOpacity: 0.35
+          },
+          interactive: false
+        }).addTo(map);
+      } catch (e) {
+        console.error("Błąd podczas ładowania flood geojson", e);
+      }
+    }
+
+    btnUpdateFlood.addEventListener("click", async () => {
+      const bounds = map.getBounds();
+      const bbox = {
+        south: bounds.getSouth(),
+        west: bounds.getWest(),
+        north: bounds.getNorth(),
+        east: bounds.getEast()
+      };
+
+      setFloodStatus("Pobieram strefy zalania z Sentinel Hub…");
+
+      try {
+        const resp = await fetch(`${API_BASE}/admin/update-flood`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bbox)
+        });
+
+        if (!resp.ok) {
+          const text = await resp.text();
+          throw new Error(`Błąd ${resp.status}: ${text}`);
+        }
+
+        const data = await resp.json();
+        setFloodStatus(`Zaktualizowano ${data.polygons} poligonów powodzi.`, "success");
+
+        await loadFloodLayer();
+      } catch (err) {
+        console.error(err);
+        setFloodStatus("Nie udało się pobrać stref zalania: " + err.message, "error");
+      }
+    });
+btnTestFloodRect.addEventListener("click", async () => {
+  const bounds = map.getBounds();
+  const bbox = {
+    south: bounds.getSouth(),
+    west: bounds.getWest(),
+    north: bounds.getNorth(),
+    east: bounds.getEast()
+  };
+
+  setFloodStatus("Ustawiam testowy prostokąt flood…");
+
+  try {
+    const resp = await fetch(`${API_BASE}/admin/set-test-flood-rect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bbox)
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`Błąd ${resp.status}: ${text}`);
+    }
+
+    const data = await resp.json();
+    setFloodStatus(
+      `Ustawiono testowy flood (${data.polygons ?? 1} poligon)`,
+      "success"
+    );
+
+    await loadFloodLayer();
+  } catch (err) {
+    console.error(err);
+    setFloodStatus(
+      "Nie udało się ustawić testowego flood: " + err.message,
+      "error"
+    );
+  }
+});
+
+    btnRoute.addEventListener("click", async () => {
+      const startLat = parseFloat(startLatInput.value);
+      const startLon = parseFloat(startLonInput.value);
+      const endLat = parseFloat(endLatInput.value);
+      const endLon = parseFloat(endLonInput.value);
+
+      if (
+        Number.isNaN(startLat) ||
+        Number.isNaN(startLon) ||
+        Number.isNaN(endLat) ||
+        Number.isNaN(endLon)
+      ) {
+        setRouteStatus("Podaj poprawne współrzędne START i META (lat, lon).", "error");
+        return;
+      }
+
+      setRouteStatus("Wyznaczam trasę…");
+
+      try {
+        const params = new URLSearchParams({
+          start: `${startLat},${startLon}`,
+          end: `${endLat},${endLon}`
+        });
+
+        const resp = await fetch(`${API_BASE}/evac/route?` + params.toString(), {
+          method: "GET"
+        });
+
+        if (resp.status === 404) {
+          setRouteStatus("Nie znaleziono trasy między podanymi punktami.", "error");
+          setRouteMetrics(null);
+          if (routeLayer) {
+            map.removeLayer(routeLayer);
+            routeLayer = null;
+          }
+          return;
+        }
+
+        if (!resp.ok) {
+          const text = await resp.text();
+          throw new Error(`Błąd ${resp.status}: ${text}`);
+        }
+
+        const data = await resp.json();
+        const coords = data.route.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+
+        if (routeLayer) {
+          map.removeLayer(routeLayer);
+        }
+
+        routeLayer = L.polyline(coords, { weight: 4 }).addTo(map);
+        map.fitBounds(routeLayer.getBounds(), { padding: [30, 30] });
+
+        setRouteStatus("Trasa wyznaczona.", "success");
+
+        setRouteMetrics({
+          length_m: data.route.properties.length_m,
+          segments: data.route.properties.segments,
+          blocked_edges_count: data.meta.blocked_edges_count
+        });
+      } catch (err) {
+        console.error(err);
+        setRouteStatus("Błąd podczas wyznaczania trasy: " + err.message, "error");
+        setRouteMetrics(null);
+      }
+    });
+
+    btnShowBlocked.addEventListener("click", async () => {
+      try {
+        const resp = await fetch(`${API_BASE}/debug/blocked-edges`, {
+          method: "GET"
+        });
+
+        if (!resp.ok) {
+          console.warn("Brak blocked_edges.geojson albo błąd API");
+          return;
+        }
+
+        const gj = await resp.json();
+
+        if (blockedLayer) {
+          map.removeLayer(blockedLayer);
+          blockedLayer = null;
+        }
+
+        blockedLayer = L.geoJSON(gj, {
+          style: {
+            color: "#f97316",   
+            weight: 4,
+            dashArray: "6,4"
+          },
+          interactive: false
+        }).addTo(map);
+      } catch (e) {
+        console.error("Błąd przy pobieraniu blocked-edges", e);
+      }
+    });
+  </script>
+</body>
+</html>
